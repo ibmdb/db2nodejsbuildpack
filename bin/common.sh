@@ -38,6 +38,8 @@ install_db2_odbc() {
 			status "downloading DB2 ODBC driver..."
 			curl ${DB2_DSDRIVER_URL} -s -o ${DB2_DIR}/clidriver.tgz
 			tar xzf ${DB2_DIR}/clidriver.tgz -C ${DB2_DIR}
+                        #Delete the archive
+                        rm -rf ${DB2_DIR}/clidriver.tgz
 		fi
 		export IBM_DB_HOME="$DB2_DIR/clidriver"
 }

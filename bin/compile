@@ -80,6 +80,7 @@ if test -d $build_dir/node_modules; then
      fi
   fi
 
+  cd "${build_dir}"
   npm rebuild 2>&1 | indent
 elif test -d $cache_dir/node_modules; then
   status "Restoring node_modules directory from cache"
