@@ -53,8 +53,7 @@ chmod +x $build_dir/vendor/node/bin/*
 PATH=$PATH:$build_dir/vendor/node/bin
 
 # Run subsequent node/npm commands from the build path
-cd $build_dir
-
+cd "${build_dir}"
 
 # If node_modules directory is checked into source control then
 # rebuild any native deps. Otherwise, restore from the build cache.
@@ -80,7 +79,6 @@ if test -d $build_dir/node_modules; then
      fi
   fi
 
-  cd "${build_dir}"
   npm rebuild 2>&1 | indent
 elif test -d $cache_dir/node_modules; then
   status "Restoring node_modules directory from cache"
