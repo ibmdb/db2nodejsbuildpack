@@ -115,7 +115,7 @@ fi
   fi
 
   status "Installing dependencies"
-  
+ 
   # if ibm_db exists setup DB2 ODBC
   if [ $(npm ls 2>&1|grep -c ibm_db) -ne 0 ]; then
       install_db2_odbc "${build_dir}"
