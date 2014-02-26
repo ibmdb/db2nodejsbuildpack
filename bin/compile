@@ -79,7 +79,13 @@ if test -d $build_dir/node_modules; then
      fi
   fi
 
+  #know current directory
+  cwd=$(pwd)
+  #change to build_dir
+  cd "$(build_dir)"
   npm rebuild 2>&1 | indent
+  #change back to known current directory
+  cd "$(cwd)"
 elif test -d $cache_dir/node_modules; then
   status "Restoring node_modules directory from cache"
   cp -r $cache_dir/node_modules $build_dir/
