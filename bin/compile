@@ -1,0 +1,174 @@
+#!/usr/bin/env bash
+
+set -e            # fail fast
+set -o pipefail   # don't ignore exit codes when piping output
+# set -x          # enable debugging
+
+# Configure directories
+build_dir=$1
+cache_dir=$2
+env_file=$3
+
+bp_dir=$(cd $(dirname $0); cd ..; pwd)
+
+# Load some convenience functions like status(), echo(), and indent()
+source $bp_dir/bin/common.sh
+
+# Output npm debug info on error
+trap cat_npm_debug_log ERR
+
+# Look in package.json's engines.node field for a semver range
+semver_range=$(cat $build_dir/package.json | $bp_dir/vendor/jq -r .engines.node)
+
+# Resolve node version using semver.io
+node_version=$(curl --silent --get --data-urlencode "range=${semver_range}" https://semver.io/node/resolve)
+
+# Recommend using semver ranges in a safe manner
+if [ "$semver_range" == "null" ]; then
+  protip "Specify a node version in package.json"
+  semver_range=""
+elif [ "$semver_range" == "*" ]; then
+  protip "Avoid using semver ranges like '*' in engines.node"
+elif [ ${semver_range:0:1} == ">" ]; then
+  protip "Avoid using semver ranges starting with '>' in engines.node"
+fi
+
+# Output info about requested range and resolved node version
+if [ "$semver_range" == "" ]; then
+  status "Defaulting to latest stable node: $node_version"
+else
+  status "Requested node range:  $semver_range"
+  status "Resolved node version: $node_version"
+fi
+
+# Download node from Heroku's S3 mirror of nodejs.org/dist
+status "Downloading and installing node"
+node_url="http://s3pository.heroku.com/node/v$node_version/node-v$node_version-linux-x64.tar.gz"
+curl $node_url -s -o - | tar xzf - -C $build_dir
+
+# Move node (and npm) into ./vendor and make them executable
+mkdir -p $build_dir/vendor
+mv $build_dir/node-v$node_version-linux-x64 $build_dir/vendor/node
+chmod +x $build_dir/vendor/node/bin/*
+PATH=$PATH:$build_dir/vendor/node/bin
+
+# Run subsequent node/npm commands from the build path
+cd $build_dir
+
+
+# If node_modules directory is checked into source control then
+# rebuild any native deps. Otherwise, restore from the build cache.
+if test -d $build_dir/node_modules; then
+  status "Found existing node_modules directory; skipping cache"
+  status "Rebuilding any native dependencies"
+  
+  # if ibm_db module is a dependency setup DB2 ODBC [DB2 CLI]
+  if [ $(npm ls 2>&1|grep -c ibm_db) -ne 0 ] ; then
+     # if ibm_db exists in package.json and cache_dir has db2 ODBC [DB2 CLI] restore from cache
+     # else setup fresh
+     if test -d $cache_dir/db2; then
+       status "Restoring DB2 ODBC driver [DB2 CLI] setup from cache"
+       cp -r $cache_dir/db2 $build_dir/
+     else
+       install_db2_odbc "${build_dir}/db2"
+     fi
+  else
+     # if ibm_db is not a dependency but cache dir has db2 ODBC [db2 cli] setup installed
+     # remove db2 cli
+     if test -d $cache_dir/db2; then
+       rm -r $cache_dir/db2
+     fi
+  fi
+
+  npm rebuild 2>&1 | indent
+elif test -d $cache_dir/node_modules; then
+  status "Restoring node_modules directory from cache"
+  cp -r $cache_dir/node_modules $build_dir/
+  
+  #restore db2 odbc [db2 cli]
+  if [ $(npm ls 2>&1|grep -c ibm_db) -ne 0 ]; then
+     # if ibm_db exists in package.json and cache_dir has db2 ODBC [DB2 CLI] restore from cache
+     # else setup fresh
+     if test -d $cache_dir/db2; then
+       status "Restoring DB2 ODBC driver [DB2 CLI] setup from cache"
+       cp -r $cache_dir/db2 $build_dir/
+     else
+       install_db2_odbc "${build_dir}/db2"
+     fi
+  else
+     # if ibm_db is not a dependency but cache dir has db2 ODBC [db2 cli] setup installed
+     # remove db2 cli
+     if test -d $cache_dir/db2; then
+       rm -r $cache_dir/db2
+     fi
+  fi
+
+  status "Pruning cached dependencies not specified in package.json"
+  npm prune 2>&1 | indent
+fi
+
+# Scope config var availability only to `npm install`
+(
+  if [ "$env_file" ]; then
+    status "Importing application config vars"
+    export $(egrep -v "^(PATH|GIT_DIR|CPATH|CPPATH|LD_PRELOAD|LIBRARY_PATH)" "$env_file")
+  fi
+
+  status "Installing dependencies"
+  
+  # if ibm_db exists setup DB2 ODBC
+  if [ $(npm ls 2>&1|grep -c ibm_db) -ne 0 ]; then
+      install_db2_odbc "${build_dir}/db2"
+  fi
+   
+  # Make npm output to STDOUT instead of its default STDERR
+  npm install --userconfig $build_dir/.npmrc --production 2>&1 | indent
+)
+
+status "Caching node_modules directory for future builds"
+rm -rf $cache_dir/node_modules
+rm -rf $cache_dir/db2
+mkdir -p $cache_dir
+test -d $build_dir/node_modules && cp -r $build_dir/node_modules $cache_dir/
+# cache db2 odbc [db2 cli] dir
+test -d $build_dir/db2 && cp -r $build_dir/db2 $cache_dir/
+
+status "Cleaning up node-gyp and npm artifacts"
+rm -rf "$build_dir/.node-gyp"
+rm -rf "$build_dir/.npm"
+
+# If Procfile is absent, try to create one using `npm start`
+if [ ! -e $build_dir/Procfile ]; then
+  npm_start=$(cat $build_dir/package.json | $bp_dir/vendor/jq -r .scripts.start)
+
+  # If `scripts.start` is set in package.json, or a server.js file
+  # is present in the app root, then create a default Procfile
+  if [ "$npm_start" != "null" ] || [ -f $build_dir/server.js ]; then
+    status "No Procfile found; Adding npm start to new Procfile"
+    echo "web: npm start" > $build_dir/Procfile
+  else
+    status "Procfile not found and npm start script is undefined"
+    protip "Create a Procfile or specify a start script in package.json"
+  fi
+fi
+
+# Update the PATH
+status "Building runtime environment"
+mkdir -p $build_dir/.profile.d
+echo "export PATH=\"\$HOME/vendor/node/bin:\$HOME/bin:\$HOME/node_modules/.bin:\$PATH\";" > $build_dir/.profile.d/nodejs.sh
+if [ $(npm ls 2>&1|grep -c ibm_db) -ne 0 ]; then
+  echo "export LD_LIBRARY_PATH=\"\$HOME/db2/clidriver/lib:\$LD_LIBRARY_PATH\"" >> $build_dir/.profile.d/nodejs.sh
+fi
+
+# Post package.json to nomnom service
+# Use a subshell so failures won't break the build.
+(
+  curl \
+    --data @$build_dir/package.json \
+    --fail \
+    --silent \
+    --request POST \
+    --header "content-type: application/json" \
+    https://nomnom.heroku.com/?request_id=$REQUEST_ID \
+    > /dev/null
+) &
