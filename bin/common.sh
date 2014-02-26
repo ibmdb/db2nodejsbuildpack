@@ -34,13 +34,10 @@ install_db2_odbc() {
 		DB2_DIR="$1"
 		if [ ! -d "$DB2_DIR" ]; then
 		    mkdir -p "$DB2_DIR"
-			DB2_DSDRIVER_URL="http://9.38.14.143/projects/mdbs/cff/v10.5fp3_linuxx64_dsdriver.tar.gz"
+			DB2_DSDRIVER_URL="https://www.ng.bluemix.net/docs/Services/BluStratus/samples/clidriver.tgz"
 			status "downloading DB2 ODBC driver..."
-			curl ${DB2_DSDRIVER_URL} -s -o ${DB2_DIR}/db2cli.tar.gz
-			tar xzf ${DB2_DIR}/db2cli.tar.gz -C ${DB2_DIR}
-			tar xzf ${DB2_DIR}/dsdriver/odbc_cli_driver/linuxamd64/ibm_data_server_driver_for_odbc_cli.tar.gz -C ${DB2_DIR}
-			rm -f   $DB2_DIR/db2cli.tar.gz
-			rm -rf  $DB2_DIR/dsdriver
+			curl ${DB2_DSDRIVER_URL} -s -o ${DB2_DIR}/clidriver.tgz
+			tar xzf ${DB2_DIR}/clidriver.tgz -C ${DB2_DIR}
 		fi
 		export IBM_DB_HOME="$DB2_DIR/clidriver"
 }

@@ -66,17 +66,17 @@ if test -d $build_dir/node_modules; then
   if [ $(npm ls 2>&1|grep -c ibm_db) -ne 0 ] ; then
      # if ibm_db exists in package.json and cache_dir has db2 ODBC [DB2 CLI] restore from cache
      # else setup fresh
-     if test -d $cache_dir/db2; then
+     if test -d $cache_dir/clidriver; then
        status "Restoring DB2 ODBC driver [DB2 CLI] setup from cache"
-       cp -r $cache_dir/db2 $build_dir/
+       cp -r $cache_dir/clidriver $build_dir/
      else
-       install_db2_odbc "${build_dir}/db2"
+       install_db2_odbc "${build_dir}"
      fi
   else
      # if ibm_db is not a dependency but cache dir has db2 ODBC [db2 cli] setup installed
      # remove db2 cli
-     if test -d $cache_dir/db2; then
-       rm -r $cache_dir/db2
+     if test -d $cache_dir/clidriver; then
+       rm -r $cache_dir/clidriver
      fi
   fi
 
@@ -89,17 +89,17 @@ elif test -d $cache_dir/node_modules; then
   if [ $(npm ls 2>&1|grep -c ibm_db) -ne 0 ]; then
      # if ibm_db exists in package.json and cache_dir has db2 ODBC [DB2 CLI] restore from cache
      # else setup fresh
-     if test -d $cache_dir/db2; then
+     if test -d $cache_dir/clidriver; then
        status "Restoring DB2 ODBC driver [DB2 CLI] setup from cache"
-       cp -r $cache_dir/db2 $build_dir/
+       cp -r $cache_dir/clidriver $build_dir/
      else
-       install_db2_odbc "${build_dir}/db2"
+       install_db2_odbc "${build_dir}"
      fi
   else
      # if ibm_db is not a dependency but cache dir has db2 ODBC [db2 cli] setup installed
      # remove db2 cli
-     if test -d $cache_dir/db2; then
-       rm -r $cache_dir/db2
+     if test -d $cache_dir/clidriver; then
+       rm -r $cache_dir/clidriver
      fi
   fi
 
@@ -118,7 +118,7 @@ fi
   
   # if ibm_db exists setup DB2 ODBC
   if [ $(npm ls 2>&1|grep -c ibm_db) -ne 0 ]; then
-      install_db2_odbc "${build_dir}/db2"
+      install_db2_odbc "${build_dir}"
   fi
    
   # Make npm output to STDOUT instead of its default STDERR
@@ -127,11 +127,11 @@ fi
 
 status "Caching node_modules directory for future builds"
 rm -rf $cache_dir/node_modules
-rm -rf $cache_dir/db2
+rm -rf $cache_dir/clidriver
 mkdir -p $cache_dir
 test -d $build_dir/node_modules && cp -r $build_dir/node_modules $cache_dir/
 # cache db2 odbc [db2 cli] dir
-test -d $build_dir/db2 && cp -r $build_dir/db2 $cache_dir/
+test -d $build_dir/clidriver && cp -r $build_dir/clidriver $cache_dir/
 
 status "Cleaning up node-gyp and npm artifacts"
 rm -rf "$build_dir/.node-gyp"
@@ -157,7 +157,7 @@ status "Building runtime environment"
 mkdir -p $build_dir/.profile.d
 echo "export PATH=\"\$HOME/vendor/node/bin:\$HOME/bin:\$HOME/node_modules/.bin:\$PATH\";" > $build_dir/.profile.d/nodejs.sh
 if [ $(npm ls 2>&1|grep -c ibm_db) -ne 0 ]; then
-  echo "export LD_LIBRARY_PATH=\"\$HOME/db2/clidriver/lib:\$LD_LIBRARY_PATH\"" >> $build_dir/.profile.d/nodejs.sh
+  echo "export LD_LIBRARY_PATH=\"\$HOME/clidriver/lib:\$LD_LIBRARY_PATH\"" >> $build_dir/.profile.d/nodejs.sh
 fi
 
 # Post package.json to nomnom service
