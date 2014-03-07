@@ -21,25 +21,27 @@ trap cat_npm_debug_log ERR
 semver_range=$(cat $build_dir/package.json | $bp_dir/vendor/jq -r .engines.node)
 
 # Resolve node version using semver.io
-node_version=$(curl --silent --get --data-urlencode "range=${semver_range}" https://semver.io/node/resolve)
+#node_version=$(curl --silent --get --data-urlencode "range=${semver_range}" https://semver.io/node/resolve)
+node_version='0.10.21'
+status "Using node version 0.10.21"
 
 # Recommend using semver ranges in a safe manner
-if [ "$semver_range" == "null" ]; then
-  protip "Specify a node version in package.json"
-  semver_range=""
-elif [ "$semver_range" == "*" ]; then
-  protip "Avoid using semver ranges like '*' in engines.node"
-elif [ ${semver_range:0:1} == ">" ]; then
-  protip "Avoid using semver ranges starting with '>' in engines.node"
-fi
+#if [ "$semver_range" == "null" ]; then
+#  protip "Specify a node version in package.json"
+#  semver_range=""
+#elif [ "$semver_range" == "*" ]; then
+#  protip "Avoid using semver ranges like '*' in engines.node"
+#elif [ ${semver_range:0:1} == ">" ]; then
+#  protip "Avoid using semver ranges starting with '>' in engines.node"
+#fi
 
 # Output info about requested range and resolved node version
-if [ "$semver_range" == "" ]; then
-  status "Defaulting to latest stable node: $node_version"
-else
-  status "Requested node range:  $semver_range"
-  status "Resolved node version: $node_version"
-fi
+#if [ "$semver_range" == "" ]; then
+#  status "Defaulting to latest stable node: $node_version"
+#else
+#  status "Requested node range:  $semver_range"
+#  status "Resolved node version: $node_version"
+#fi
 
 # Download node from Heroku's S3 mirror of nodejs.org/dist
 status "Downloading and installing node"
